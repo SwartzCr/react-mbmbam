@@ -1,7 +1,5 @@
 import React from 'react';
 import ReactTooltip from 'react-tooltip'
-import Opentip from "../opentip-native.js"
-import "../opentip.css"
 
 import $ from 'jquery';
 
@@ -41,12 +39,23 @@ var TextBox = React.createClass({
       success: function(data) {
         let dict = {}
         data.forEach(function(word, idx) {
-            let time = word.time;
-            let arr = time.split(":");
-            let ms = parseInt(arr[0])*3600 + parseInt(arr[1])*60 + parseFloat(arr[2]);
-            dict[idx] = ms;
+            //let time = word.time;
+            //let arr = time.split(":");
+            //let ms = parseInt(arr[0])*3600 + parseInt(arr[1])*60 + parseFloat(arr[2]);
+            dict[idx] = word[1];
         });
-        this.setState({data: data});
+        let out = [];
+        data.forEach(function(elm, idx) {
+            let obj = new Object();
+            obj.text = elm[0];
+            obj.timestamp = elm[1];
+            obj.position = elm[2];
+            obj.speaker = "";
+            out.push(obj);
+        });
+        console.log(out);
+        console.log(dict);
+        this.setState({data: out});
         this.setState({stamps: dict});
       }.bind(this),
       error: function(xhr, status, err) {
@@ -70,9 +79,9 @@ var TextBox = React.createClass({
       }.bind(this) 
     });
   },
-  setGriffin: function() {
+  setSpeaker: function(who) {
     this.state.selected.forEach(function(id) {
-      this.state.data[id].speaker = "Griffin";
+      this.state.data[id].speaker = who;
     }.bind(this));
     console.log(this.state.data);
     this.sendSpeakerUpdatesToServer();
@@ -113,7 +122,13 @@ var TextBox = React.createClass({
           }
         }
         if(key.code == "KeyG"){
-          this.setGriffin();
+          this.setSpeaker("Griffin");
+        }
+        if(key.code == "KeyJ"){
+          this.setSpeaker("Justin");
+        }
+        if(key.code == "KeyT"){
+          this.setSpeaker("Travis");
         }
         if(key.code == "KeyE"){
           this.setState({tooltip: true});
@@ -194,63 +209,84 @@ var TextBox = React.createClass({
 var Word = React.createClass({
   callback: function(e) {
       e.preventDefault();
-      this.props.formCB(this.props.id, this.state.value);
-  },
-  getInitialState: function() {
-    return {value: "", tt: false, tooltip: false};
+      this.props.formCB(this.props.position, this.state.value);
   },
   handleChange: function(e) {
-        this.setState({value: e.target.value});
+      this.setState({value: e.target.value});
+      $(this.refs.foo).trigger('mousemove', {type: 'custom mouse move'});
   },
-  componentWillReceiveProps(newprops) {
-    if (newprops.tooltip && !this.state.tooltip && this.props.id === this.props.hilight.toString()) {
-      console.log('made a tooltip');
-      let target = "#"+{this.props.id}
-      let new_tooltip = new Opentip(this.refs.foo, 'banana', 'abababannbanb', {target: {target}, tipJoint: "top"});
-      new_tooltip.show();
-      this.setState({tooltip: new_tooltip});
-    }
+  handleState: function(val) {
+      this.setState({value: val});
   },
-  componentDidMount: function() {
-   // let t = new Opentip(this.refs.foo, "banana", "bananaasdas foster");
-    //this.setState({tooltip: t});
+  getInitialState: function() {
+    return {value: "", tt: null};
+  },
+  componentWillReceiveProps: function(nextProps) {
+      if (nextProps.tooltip && this.props.position === this.props.hilight && !this.state.tt) {
+          let tooltip = <ReactTooltip id={this.props.position} place="top" effect="solid"> <form onSubmit={this.callback}><ReInput cb={this.handleState} /></form> </ReactTooltip>; 
+          this.setState({tt: tooltip}, this.showTT);
+      }
+      if (!nextProps.tooltip && this.state.tt) {
+          this.setState({tt: null});
+      }
+  },
+  showTT: function() {
+    ReactTooltip.show(this.refs.foo);
+    console.log("showing tooltip");
   },
   render: function() {
     let style;
-    let tooltip;
     let pointer = {pointerEvents: "auto"};
-    if(this.props.id === this.props.hilight.toString()){
+    if(this.props.position === this.props.hilight){
         style = {color: "magenta"};
-        if(this.props.tooltip && !this.state.tt){
-            //this.state.tooltip.show();
-            //this.setState({tt: true})
-            //console.log(tooltip);
-            //tooltip = <ReactTooltip id={this.props.id} place="top" effect="solid"> <form onSubmit={this.callback}><input id="text_box" type="text" value={this.state.value} onChange={this.handleChange} /></form> </ReactTooltip>; 
-            //ReactTooltip.show(this.refs.foo);
-        } 
-    } else if (this.props.selected && this.props.selected.indexOf(parseInt(this.props.id)) > -1) {
+    } else if (this.props.selected && this.props.selected.indexOf(this.props.position) > -1) {
         style = {color: "blue"};
     } else if (this.props.speaker === "Griffin") {
         style = {color: "green"};
+    } else if (this.props.speaker === "Justin") {
+        style = {color: "orange"};
+    } else if (this.props.speaker === "Travis") {
+        style = {color: "yellow"};
     } else {
         style = {color: "black"};
     }
     let inline = {display: "inline"};
     return (
      <div style={inline}>
-      <a style={style} id={this.props.id} ref='foo' data-tip  data-for={this.props.id}>
+      <a style={style} id={this.props.position} ref='foo' data-tip  data-for={this.props.position}>
           {this.props.text} { " " }
       </a>
+      {this.state.tt}
       </div>
     );
   }
+});
+
+var ReInput = React.createClass({
+  handleChange: function(e) {
+      this.setState({value: e.target.value});
+      this.props.cb(e.target.value);
+  },
+  getInitialState: function() {
+    return {value: ""};
+  },
+  componentDidMount: function() {
+      this.refs.inp.focus();
+      console.log("YES");
+      console.log(this.refs.inp);
+  },
+  render: function() {
+    return (
+        <input id="text_box" type="text" ref="inp" value={this.state.value} onChange={this.handleChange} />
+    );
+   }
 });
 
 var WordList = React.createClass({
   render: function() {
     var wordNodes = this.props.data.map((word) => {
       return (
-        <Word id={word.id} text={word.text} tooltip={this.props.tooltip} formCB={this.props.formCB} selected={this.props.selected} speaker={word.speaker} hilight={this.props.hilight}>
+        <Word position={word.position} text={word.text} tooltip={this.props.tooltip} formCB={this.props.formCB} selected={this.props.selected} speaker={word.speaker} hilight={this.props.hilight}>
         </Word>
       );
     });
